@@ -2,6 +2,8 @@ package com.github.minyk.morphlinesmr.mapper;
 
 import com.github.minyk.morphlinesmr.counter.MorphlinesMRCounters;
 import com.github.minyk.morphlinesmr.partitioner.ExceptionPartitioner;
+import com.google.common.collect.ListMultimap;
+
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -36,10 +38,16 @@ public class MapperRecordEmitter implements Command {
 
     @Override
     public boolean process(Record record) {
-        output_key.set(record.get("key").get(0).toString());
-        output_value.set(record.get("value").get(0).toString());
-        try {
+    	if(record.get("out-key").isEmpty()) {
+    		output_key.set(System.currentTimeMillis()+"");
+    	}
+        output_value.set(record.get("out-value").get(0).toString());
+        
+    	try {
             context.write(output_key, output_value);
+            if(LOGGER.isDebugEnabled()) {
+                LOGGER.debug("Check Exception: " + output_key.toString() + ", " + output_key.toString().startsWith(ExceptionPartitioner.EXCEPTION_KEY_VALUE));
+            }
             if(output_key.toString().startsWith(ExceptionPartitioner.EXCEPTION_KEY_VALUE)) {
                 exception.increment(1L);
             } else {
