@@ -6,11 +6,11 @@
     <groupId>morphlines-mr</groupId>
     <artifactId>morphlines-mr</artifactId>
     <packaging>jar</packaging>
-    <version>0.6.0-hadoop2</version>
+    <version>0.4-hadoop0.20</version>
 
     <properties>
-        <kite-version>1.0.0</kite-version>
-        <hadoop-version>2.6.0</hadoop-version>
+        <kite-version>1.1.0</kite-version>
+        <hadoop-version>2.6.0-cdh5.4.8</hadoop-version>
     </properties>
 
 
@@ -61,7 +61,7 @@
                     </archive>
                 </configuration>
             </plugin>
-            <plugin>
+        <!--     <plugin>
                 <groupId>com.ruleoftech</groupId>
                 <artifactId>markdown-page-generator-plugin</artifactId>
                 <version>0.6</version>
@@ -79,7 +79,7 @@
                     <copyDirectories>css,images</copyDirectories>
                     <pegdownExtensions>TABLES,FENCED_CODE_BLOCKS,AUTOLINKS</pegdownExtensions>
                 </configuration>
-            </plugin>
+            </plugin> -->
         </plugins>
         <resources>
             <resource>
@@ -108,13 +108,7 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>1.7.2</version>
-        </dependency>
-
-        <dependency>
-            <groupId>info.ganglia.gmetric4j</groupId>
-            <artifactId>gmetric4j</artifactId>
-            <version>1.0.7</version>
+            <version>1.4.3</version>
         </dependency>
 
         <dependency>
@@ -123,6 +117,26 @@
             <version>${kite-version}</version>
             <type>pom</type>
             <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>jcl-over-slf4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-hdfs</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-common</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-auth</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-annotations</artifactId>
+                </exclusion>
                 <exclusion>
                     <groupId>org.apache.solr</groupId>
                     <artifactId>solr-cell</artifactId>
@@ -165,6 +179,10 @@
                 </exclusion>
                 <exclusion>
                     <groupId>org.kitesdk</groupId>
+                    <artifactId>kite-morphlines-metrics-servlets</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.kitesdk</groupId>
                     <artifactId>kite-morphlines-hadoop-parquet-avro</artifactId>
                 </exclusion>
                 <exclusion>
@@ -202,9 +220,9 @@
         <dependency>
             <groupId>org.apache.mrunit</groupId>
             <artifactId>mrunit</artifactId>
-            <classifier>hadoop2</classifier>
+            <classifier>hadoop1</classifier>
             <scope>test</scope>
-            <version>1.1.0</version>
+            <version>0.9.0-incubating</version>
         </dependency>
 
         <dependency>
@@ -223,7 +241,7 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
             <scope>test</scope>
-            <version>1.7.5</version>
+            <version>1.4.3</version>
         </dependency>
 
         <dependency>
@@ -232,11 +250,22 @@
             <version>2.4</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-client</artifactId>
-            <version>${hadoop-version}</version>
-        </dependency>
+		<dependency>
+			<groupId>org.apache.hadoop</groupId>
+			<artifactId>hadoop-common</artifactId>
+			<version>${hadoop-version}</version>
+			<exclusions>
+				<exclusion>
+					<artifactId>hadoop-annotations</artifactId>
+					<groupId>org.apache.hadoop</groupId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hadoop</groupId>
+			<artifactId>hadoop-core</artifactId>
+			<version>2.6.0-mr1-cdh5.4.8</version>
+		</dependency>
     </dependencies>
 
 </project>
