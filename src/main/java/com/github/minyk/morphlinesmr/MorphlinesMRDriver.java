@@ -1,58 +1,62 @@
 package com.github.minyk.morphlinesmr;
 
-import com.github.minyk.morphlinesmr.counter.MorphlinesMRCounters;
-import com.github.minyk.morphlinesmr.job.MorphlinesJob;
-import com.github.minyk.morphlinesmr.mapper.IgnoreKeyOutputFormat;
-import com.github.minyk.morphlinesmr.mapper.MorphlinesMapper;
-import com.github.minyk.morphlinesmr.partitioner.ExceptionPartitioner;
-import com.github.minyk.morphlinesmr.reducer.IdentityReducer;
-import com.google.common.base.Preconditions;
-import info.ganglia.gmetric4j.gmetric.GMetric;
-import org.apache.commons.cli.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+
+import org.apache.commons.cli.BasicParser;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.MissingOptionException;
+import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.filecache.DistributedCache;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapreduce.*;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.Counter;
+import org.apache.hadoop.mapreduce.CounterGroup;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import com.github.minyk.morphlinesmr.counter.MorphlinesMRCounters;
+import com.github.minyk.morphlinesmr.mapper.IgnoreKeyOutputFormat;
+import com.github.minyk.morphlinesmr.mapper.MorphlinesMapper;
+import com.github.minyk.morphlinesmr.partitioner.ExceptionPartitioner;
+import com.github.minyk.morphlinesmr.reducer.IdentityReducer;
+
+import hfile.HFileInputFormat;
 
 public class MorphlinesMRDriver extends Configured implements Tool {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MorphlinesMRDriver.class);
     private static final String RESULT_FILE_PREFIX = "part-r-";
-    // Make Job obj.
-    private MorphlinesJob job;
 
     private Options buildOption() {
         Options opts = new Options();
         Option mfile = new Option("f", "morphline-file", true, "target morphline file. Required.");
-        mfile.setRequired(false);
+        mfile.setRequired(true);
         opts.addOption(mfile);
 
         Option mid = new Option("m", "morphlie-id", true, "target morphline id in the file. Required.");
-        mid.setRequired(false);
+        mid.setRequired(true);
         opts.addOption(mid);
 
         Option input = new Option("i", "input", true, "input location. Required.");
-        input.setRequired(false);
+        input.setRequired(true);
         opts.addOption(input);
 
         Option output = new Option("o", "output", true, "output location. Required.");
-        output.setRequired(false);
+        output.setRequired(true);
         opts.addOption(output);
 
         Option exception = new Option("e", "exception", true, "exception location");
@@ -79,13 +83,14 @@ public class MorphlinesMRDriver extends Configured implements Tool {
         local.setRequired(false);
         opts.addOption(local);
 
+        Option dictionaries = new Option("d", "grok-dictionaries", true, "grok dictionaries.");
+        dictionaries.setRequired(false);
+        opts.addOption(dictionaries);
+
         Option counters = new Option("c", "save-counters", true, "Local path to save counters.");
         counters.setRequired(false);
         opts.addOption(counters);
-
-        Option ganglia = new Option("g", "ganglia", true, "ganglia gmeta server.");
-        ganglia.setRequired(false);
-        opts.addOption(ganglia);
+        
 
         return opts;
     }
@@ -93,112 +98,83 @@ public class MorphlinesMRDriver extends Configured implements Tool {
     @Override
     public int run(String[] args) throws Exception {
 
+        if(args.length < 1) {
+            HelpFormatter formatter = new HelpFormatter();
+            formatter.printHelp("hadoop jar morphlines-mr.jar",buildOption());
+            ToolRunner.printGenericCommandUsage(System.out);
+            System.exit(1);
+        }
+
         CommandLineParser parser = new BasicParser();
         CommandLine cmd = parser.parse(buildOption(), args, true);
 
         Configuration config = this.getConf();
 
         // Load conf from command line.
-        if (cmd.hasOption('f')) {
-            config.set(MorphlinesMRConfig.MORPHLINE_FILE, cmd.getOptionValue('f'));
-        }
-
-        if (cmd.hasOption('m')) {
-            config.set(MorphlinesMRConfig.MORPHLINE_ID, cmd.getOptionValue('m'));
-        }
-
-        if (cmd.hasOption('i')) {
+        if(cmd.hasOption('i')) {
             config.set(MorphlinesMRConfig.INPUT_PATH, cmd.getOptionValue('i'));
         }
 
-        if (cmd.hasOption('o')) {
+        if(cmd.hasOption('o')) {
             config.set(MorphlinesMRConfig.OUTPUT_PATH, cmd.getOptionValue('o'));
         }
 
-        if (cmd.hasOption('e')) {
+        if(cmd.hasOption('e')) {
             config.set(MorphlinesMRConfig.EXCEPTION_PATH, cmd.getOptionValue('e'));
         } else {
             config.set(MorphlinesMRConfig.EXCEPTION_PATH, MorphlinesMRConfig.EXCEPTION_PATH_DEFAULT);
         }
 
-        if (cmd.hasOption('l')) {
+        if(cmd.hasOption('l')) {
             config.set(MorphlinesMRConfig.MORPHLINESMR_MODE, MorphlinesMRConfig.MORPHLIESMR_MODE_LOCAL);
         } else {
             config.set(MorphlinesMRConfig.MORPHLINESMR_MODE, MorphlinesMRConfig.MORPHLIESMR_MODE_MR);
         }
 
-        if (cmd.hasOption('j')) {
+        if(cmd.hasOption('j')) {
             config.set(MorphlinesMRConfig.JOB_NAME, cmd.getOptionValue('j'));
         }
 
+        if(cmd.hasOption('f')) {
+            config.set(MorphlinesMRConfig.MORPHLINE_FILE, cmd.getOptionValue('f'));
+        }
 
-        if (cmd.hasOption('g')) {
+        if(cmd.hasOption('m')) {
+            config.set(MorphlinesMRConfig.MORPHLINE_ID, cmd.getOptionValue('m'));
+        }
+
+        if(cmd.hasOption('g')) {
             config.set(MorphlinesMRConfig.METRICS_GANGLAI_SINK, cmd.getOptionValue('g'));
         }
 
-        if (cmd.hasOption('r')) {
-            config.set(MorphlinesMRConfig.MORPHLINESMR_REDUCERS, String.valueOf(MorphlinesMRConfig.MORPHLINESMR_REDUCERS));
-            config.set(MorphlinesMRConfig.MORPHLINESMR_REDUCERS_EXCEPTION, String.valueOf(MorphlinesMRConfig.MORPHLINESMR_REDUCERS_EXCEPTION));
+        if(cmd.hasOption('r')) {
+            config.set(MorphlinesMRConfig.MORPHLINESMR_REDUCERS, "10");
+            config.set(MorphlinesMRConfig.MORPHLINESMR_REDUCERS_EXCEPTION, "2");
         }
 
-        if (cmd.hasOption('n')) {
+        if(cmd.hasOption('n')) {
             config.set(MorphlinesMRConfig.MORPHLINESMR_REDUCERS, cmd.getOptionValue('n'));
         }
 
-        if (cmd.hasOption('x')) {
+        if(cmd.hasOption('x')) {
             config.set(MorphlinesMRConfig.MORPHLINESMR_REDUCERS_EXCEPTION, cmd.getOptionValue('x'));
         }
 
-        if (cmd.hasOption('c')) {
+        if(cmd.hasOption('c')) {
             config.set(MorphlinesMRConfig.COUNTER_PATH, cmd.getOptionValue('c'));
         }
 
-        // Do the Job.
-        int result = dojob(config);
+        
 
-        if(result == 0) {
-            if(cmd.hasOption('c')) {
-                saveJobLogs(job);
-            }
-        }
+        // 1 left
 
-        return result;
-    }
+        // Make Job obj.
 
-    public MorphlinesJob run(Configuration conf) throws Exception {
-
-        // Do the Job.
-        dojob(conf);
-
-        return job;
-    }
-
-    private int dojob(Configuration config) throws Exception {
-        // Validate conf before start
-        validateConf(config);
-
-        if(!config.get(MorphlinesMRConfig.METRICS_GANGLAI_SINK,"").isEmpty()) {
-            String ganglia_server = config.get(MorphlinesMRConfig.METRICS_GANGLAI_SINK);
-            LOGGER.info("Use ganglia: " + ganglia_server);
-            if(ganglia_server.contains(":")) {
-                String[] server = ganglia_server.split("\\:");
-                job = MorphlinesJob.getInstance(config, config.get(MorphlinesMRConfig.JOB_NAME), server[0], Integer.parseInt(server[1]), GMetric.UDPAddressingMode.getModeForAddress(server[0]) );
-            } else {
-                job = MorphlinesJob.getInstance(config, config.get(MorphlinesMRConfig.JOB_NAME), ganglia_server, 8649, GMetric.UDPAddressingMode.getModeForAddress(ganglia_server));
-            }
-        } else {
-            job = MorphlinesJob.getInstance(this.getConf(), config.get(MorphlinesMRConfig.JOB_NAME));
-        }
-
+        Job job = new Job(config, config.get(MorphlinesMRConfig.JOB_NAME,MorphlinesMRConfig.JOB_NAME_DEFALUT));
         job.setJarByClass(MorphlinesMRDriver.class);
         job.setMapperClass(MorphlinesMapper.class);
 
         Configuration conf = job.getConfiguration();
-
-        // Prepare values
-        int normalReducers = conf.getInt(MorphlinesMRConfig.MORPHLINESMR_REDUCERS, MorphlinesMRConfig.DEFAULT_MORPHLINESMR_REDUCERS);
-        int exceptionReducers = conf.getInt(MorphlinesMRConfig.MORPHLINESMR_REDUCERS_EXCEPTION, MorphlinesMRConfig.DEFAULT_MORPHLINESMR_REDUCERS_EXCEPTION);
-        int totalReducers = normalReducers + exceptionReducers;
 
         if (conf.get(MorphlinesMRConfig.MORPHLINESMR_MODE).equals(MorphlinesMRConfig.MORPHLIESMR_MODE_LOCAL)) {
             LOGGER.info("Use local mode.");
@@ -208,16 +184,18 @@ public class MorphlinesMRDriver extends Configured implements Tool {
         } else {
             Path morphlinefile = new Path(conf.get(MorphlinesMRConfig.MORPHLINE_FILE));
             LOGGER.info("Use morphlines conf: " + morphlinefile.toString());
-            job.addCacheFile(morphlinefile.toUri());
+            DistributedCache.addCacheFile(morphlinefile.toUri(), conf);
         }
 
-        if( normalReducers != 0 || exceptionReducers != 0) {
-            LOGGER.info("Use reducers: true");
-            LOGGER.info("Number of total reducers: " + (totalReducers));
-            LOGGER.info("Number of exception reducers: " + exceptionReducers);
+        if(cmd.hasOption('r') || cmd.hasOption('n') || cmd.hasOption('e')) {
+            int tr = conf.getInt(MorphlinesMRConfig.MORPHLINESMR_REDUCERS, 10);
+            int er = conf.getInt(MorphlinesMRConfig.MORPHLINESMR_REDUCERS_EXCEPTION, 2);
 
-            job.setNumReduceTasks((totalReducers));
-            job.getConfiguration().setInt(ExceptionPartitioner.EXCEPRION_REDUCERS, exceptionReducers);
+            LOGGER.info("Use reducers: true");
+            LOGGER.info("Number of total reducers: " + (tr + er));
+            LOGGER.info("Number of exception reducers: " + er);
+
+            job.setNumReduceTasks((tr+er));
             job.setReducerClass(IdentityReducer.class);
             job.setPartitionerClass(ExceptionPartitioner.class);
             job.setMapOutputKeyClass(Text.class);
@@ -241,23 +219,35 @@ public class MorphlinesMRDriver extends Configured implements Tool {
                 fs.delete(outputPath, true);
                 LOGGER.info("Existing output path deleted: " + outputPath.toUri().getPath());
             }
+            if(cmd.hasOption('e')) {
+                Path exceptionPath = new Path(conf.get(MorphlinesMRConfig.EXCEPTION_PATH));
+                if(fs.exists(exceptionPath)) {
+                    fs.delete(exceptionPath, true);
+                    LOGGER.info("Existing exception path deleted: "+ exceptionPath.toUri().getPath());
+                }
+            }
         } catch (Exception e) {
             LOGGER.error(e.getMessage());
-            throw e;
+            System.exit(1);
         } finally {
             fs.close();
         }
-
-        FileInputFormat.addInputPath(job, new Path(input_path));
+        job.setInputFormatClass(HFileInputFormat.class);
+        HFileInputFormat.addInputPath(job, new Path(input_path));
         IgnoreKeyOutputFormat.setOutputPath(job, outputPath);
 
         int result = job.waitForCompletion(true) ? 0 : 1;
 
         if(result == 0) {
-            if(exceptionReducers > 0) {
-                moveExeptions(totalReducers, normalReducers);
+            LOGGER.info("tasks : " + job.getNumReduceTasks());
+            if(job.getNumReduceTasks() > 0) {
+               moveExeptions(job);
             }
+          if(cmd.hasOption('c')) {
+              saveJobLogs(job);
+          }
         }
+
 
         return result;
     }
@@ -316,21 +306,18 @@ public class MorphlinesMRDriver extends Configured implements Tool {
         bw.close();
     }
 
-    private void moveExeptions(int totalReducers, int normalReducers) throws IOException {
+    private void moveExeptions(Job job) throws IOException {
         Configuration conf = job.getConfiguration();
         FileSystem fs = FileSystem.get(conf);
-
-        Path outputPath = new Path(conf.get(MorphlinesMRConfig.OUTPUT_PATH));
-        Path exceptionPath = new Path(conf.get(MorphlinesMRConfig.EXCEPTION_PATH));
+        int totalReducer = job.getNumReduceTasks();
+        int normalReducer = conf.getInt(MorphlinesMRConfig.MORPHLINESMR_REDUCERS, 10);
+        String output_path = conf.get(MorphlinesMRConfig.OUTPUT_PATH);
+        String exception_path = conf.get(MorphlinesMRConfig.EXCEPTION_PATH);
         try {
-            if(fs.exists(exceptionPath)) {
-                fs.delete(exceptionPath, true);
-                LOGGER.info("Existing exception path deleted: "+ exceptionPath.toUri().getPath());
-            }
-            fs.mkdirs(exceptionPath);
-            for(int i = totalReducers - 1; i > normalReducers - 1; i-- ) {
-                String exceptionOutput = outputPath.toString() + "/" + RESULT_FILE_PREFIX + String.format("%05d", i);
-                String exceptionFile = exceptionPath.toString() + "/" + RESULT_FILE_PREFIX + String.format("%05d", i);
+            fs.mkdirs(new Path(exception_path));
+            for(int i = totalReducer - 1; i > normalReducer - 1; i-- ) {
+                String exceptionOutput = output_path + "/" + RESULT_FILE_PREFIX + String.format("%05d", i);
+                String exceptionFile = exception_path + "/" + RESULT_FILE_PREFIX + String.format("%05d", i);
                 fs.rename(new Path(exceptionOutput), new Path(exceptionFile));
             }
 
@@ -339,13 +326,6 @@ public class MorphlinesMRDriver extends Configured implements Tool {
         } finally {
             fs.close();
         }
-    }
-
-    private void validateConf(Configuration conf) throws Exception  {
-        Preconditions.checkNotNull(conf.get(MorphlinesMRConfig.MORPHLINE_FILE), "Error: " + MorphlinesMRConfig.MORPHLINE_FILE + " should be set by hadoop common option or -f option.");
-        Preconditions.checkNotNull(conf.get(MorphlinesMRConfig.MORPHLINE_ID), "Error: " + MorphlinesMRConfig.MORPHLINE_ID + " should be set by hadoop common option or -m option.");
-        Preconditions.checkNotNull(conf.get(MorphlinesMRConfig.INPUT_PATH), "Error: " + MorphlinesMRConfig.INPUT_PATH + " should be set by hadoop common option or -i option.");
-        Preconditions.checkNotNull(conf.get(MorphlinesMRConfig.OUTPUT_PATH), "Error: " + MorphlinesMRConfig.OUTPUT_PATH + " should be set by hadoop common option or -o option.");
     }
 
 }
