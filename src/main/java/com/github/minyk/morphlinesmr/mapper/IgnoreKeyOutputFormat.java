@@ -21,6 +21,9 @@ import java.io.UnsupportedEncodingException;
  * Created by drake on 9/17/14.
  */
 public class IgnoreKeyOutputFormat<K,V> extends TextOutputFormat<K,V> {
+
+    public static String SEPERATOR = "mapreduce.output.textoutputformat.separator";
+
     protected static class IgnoreKeyLineRecordWriter<K, V> extends RecordWriter<K, V> {
         private static final String utf8 = "UTF-8";
         private static final byte[] newline;
@@ -86,19 +89,21 @@ public class IgnoreKeyOutputFormat<K,V> extends TextOutputFormat<K,V> {
     getRecordWriter(TaskAttemptContext job
     ) throws IOException, InterruptedException {
         Configuration conf = job.getConfiguration();
-        boolean isCompressed = getCompressOutput(job);
+//        boolean isCompressed = getCompressOutput(job);
         String keyValueSeparator= conf.get(SEPERATOR, "\t");
         CompressionCodec codec = null;
         String extension = "";
-        if (isCompressed) {
+/*        if (isCompressed) {
             Class<? extends CompressionCodec> codecClass =
                     getOutputCompressorClass(job, GzipCodec.class);
             codec = (CompressionCodec) ReflectionUtils.newInstance(codecClass, conf);
             extension = codec.getDefaultExtension();
-        }
+        }*/
         Path file = getDefaultWorkFile(job, extension);
         FileSystem fs = file.getFileSystem(conf);
-        if (!isCompressed) {
+        FSDataOutputStream fileOut = fs.create(file, false);
+        return new IgnoreKeyLineRecordWriter<K, V>(fileOut, keyValueSeparator);
+/*        if (!isCompressed) {
             FSDataOutputStream fileOut = fs.create(file, false);
             return new IgnoreKeyLineRecordWriter<K, V>(fileOut, keyValueSeparator);
         } else {
@@ -106,6 +111,6 @@ public class IgnoreKeyOutputFormat<K,V> extends TextOutputFormat<K,V> {
             return new IgnoreKeyLineRecordWriter<K, V>(new DataOutputStream
                     (codec.createOutputStream(fileOut)),
                     keyValueSeparator);
-        }
+        }*/
     }
 }
