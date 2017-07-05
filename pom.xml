@@ -3,10 +3,10 @@
          xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>morphlines-mr</groupId>
-    <artifactId>morphlines-mr</artifactId>
+    <groupId>morphlines-mr-hfile</groupId>
+    <artifactId>morphlines-mr-hfile</artifactId>
     <packaging>jar</packaging>
-    <version>0.4-hadoop0.20</version>
+    <version>0.4-hadoop-cdh5.4.8</version>
 
     <properties>
         <kite-version>1.1.0</kite-version>
