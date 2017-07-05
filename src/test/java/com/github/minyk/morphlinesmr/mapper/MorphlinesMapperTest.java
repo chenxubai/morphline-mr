@@ -1,16 +1,18 @@
 package com.github.minyk.morphlinesmr.mapper;
 
-import com.github.minyk.morphlinesmr.MorphlinesMRConfig;
-import com.github.minyk.morphlinesmr.partitioner.ExceptionPartitioner;
-import org.apache.hadoop.io.LongWritable;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
+
+import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mrunit.mapreduce.MapDriver;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.net.URL;
+import com.github.minyk.morphlinesmr.MorphlinesMRConfig;
+import com.github.minyk.morphlinesmr.partitioner.ExceptionPartitioner;
 
 
 /**
@@ -18,7 +20,7 @@ import java.net.URL;
  */
 public class MorphlinesMapperTest {
 
-    MapDriver<LongWritable, Text, Text, Text> mapDriver;
+    MapDriver<ImmutableBytesWritable, KeyValue, Text, Text> mapDriver;
 
     @Before
     public void setUp() throws URISyntaxException {
@@ -35,7 +37,8 @@ public class MorphlinesMapperTest {
     @Test
     public void testNormalCase() {
         mapDriver.clearInput();
-        mapDriver.withInput(new LongWritable(0), new Text("Feb  4 10:46:14 syslog sshd[607]: listening on 0.0.0.0 port 22."));
+        mapDriver.withInput(new ImmutableBytesWritable(), new KeyValue());
+//        mapDriver.withInput(new LongWritable(0), new Text("Feb  4 10:46:14 syslog sshd[607]: listening on 0.0.0.0 port 22."));
         mapDriver.withOutput(new Text("syslog,sshd"), new Text("2943974000,syslog,sshd,listening on 0.0.0.0 port 22."));
         try {
             mapDriver.runTest();
@@ -47,7 +50,8 @@ public class MorphlinesMapperTest {
     @Test
     public void testExceptionCase() {
         mapDriver.clearInput();
-        mapDriver.withInput(new LongWritable(0), new Text("<>Feb  4 10:46:14 syslog sshd[607]: listening on 0.0.0.0 port 22."));
+        mapDriver.withInput(new ImmutableBytesWritable(), new KeyValue());
+//        mapDriver.withInput(new LongWritable(0), new Text("<>Feb  4 10:46:14 syslog sshd[607]: listening on 0.0.0.0 port 22."));
         mapDriver.withOutput(new Text(ExceptionPartitioner.EXCEPTION_KEY_VALUE), new Text("<>Feb  4 10:46:14 syslog sshd[607]: listening on 0.0.0.0 port 22."));
         try {
             mapDriver.runTest();

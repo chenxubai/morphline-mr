@@ -1,16 +1,18 @@
 package com.github.minyk.morphlinesmr.commands;
 
-import com.github.minyk.morphlinesmr.MorphlinesMRConfig;
-import com.github.minyk.morphlinesmr.mapper.MorphlinesMapper;
-import org.apache.hadoop.io.LongWritable;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
+
+import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mrunit.mapreduce.MapDriver;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.net.URL;
+import com.github.minyk.morphlinesmr.MorphlinesMRConfig;
+import com.github.minyk.morphlinesmr.mapper.MorphlinesMapper;
 
 
 /**
@@ -18,7 +20,7 @@ import java.net.URL;
  */
 public class MorphlinesMapperCSVTest {
 
-    MapDriver<LongWritable, Text, Text, Text> mapDriver;
+    MapDriver<ImmutableBytesWritable, KeyValue, Text, Text> mapDriver;
 
     @Before
     public void setUp() throws URISyntaxException {
@@ -34,7 +36,8 @@ public class MorphlinesMapperCSVTest {
     @Test
     public void testNormalCase() {
         mapDriver.clearInput();
-        mapDriver.withInput(new LongWritable(0), new Text("1,2,3"));
+        mapDriver.withInput(new ImmutableBytesWritable(), new KeyValue());
+//        mapDriver.withInput(new LongWritable(0), new Text("1,2,3"));
         mapDriver.withOutput(new Text("1"), new Text("3|2|1"));
         try {
             mapDriver.runTest();

@@ -1,9 +1,5 @@
 package com.github.minyk.morphlinesmr.mapper;
 
-import com.github.minyk.morphlinesmr.counter.MorphlinesMRCounters;
-import com.github.minyk.morphlinesmr.partitioner.ExceptionPartitioner;
-import com.google.common.collect.ListMultimap;
-
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -11,6 +7,9 @@ import org.kitesdk.morphline.api.Command;
 import org.kitesdk.morphline.api.Record;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.github.minyk.morphlinesmr.counter.MorphlinesMRCounters;
+import com.github.minyk.morphlinesmr.partitioner.ExceptionPartitioner;
 
 public class MapperRecordEmitter implements Command {
     private static final Logger LOGGER = LoggerFactory.getLogger(MapperRecordEmitter.class);

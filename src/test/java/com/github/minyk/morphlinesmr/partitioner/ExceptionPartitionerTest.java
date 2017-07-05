@@ -1,13 +1,13 @@
 package com.github.minyk.morphlinesmr.partitioner;
 
-import junit.framework.Assert;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mrunit.mapreduce.MapReduceDriver;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import junit.framework.Assert;
 
 
 /**
@@ -28,7 +28,7 @@ public class ExceptionPartitionerTest {
     public void setUp() {
         driver = new MapReduceDriver();
         driver.getConfiguration().set(ExceptionPartitioner.EXCEPRION_REDUCERS, String.valueOf(EXCEPTION_REDUCER_MAXIMUM + 1));
-        driver.getConfiguration().set(MRJobConfig.NUM_REDUCES, String.valueOf(NORMAL_REDUCER_MAXIMUM + EXCEPTION_REDUCER_MAXIMUM + 2));
+//        driver.getConfiguration().set(MRJobConfig.NUM_REDUCES, String.valueOf(NORMAL_REDUCER_MAXIMUM + EXCEPTION_REDUCER_MAXIMUM + 2));
         partitioner = new ExceptionPartitioner();
         partitioner.setConf(driver.getConfiguration());
     }
